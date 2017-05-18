@@ -18,20 +18,22 @@ namespace ProcessSizeWatcher
             for (;;)
             {
                 Process[] allProcs = Process.GetProcesses();
+
                 var results =
                     allProcs.Select(n => new
                     {
                         Id = n.Id,
                         PrivateBytes = n.PrivateMemorySize64,
                         VirtualSize = n.VirtualMemorySize64,
-                        Name = n.ProcessName
+                        Name = n.ProcessName,
+                        WorkingSet = n.WorkingSet64,
                     }).ToArray();
 
                 DateTime now = DateTime.Now;
                 Console.Clear();
                 foreach (var result in results)
                 {
-                    string line = $"{now.Ticks}, {result.Name}, {result.Id}, {result.PrivateBytes}, {result.VirtualSize}{Environment.NewLine}";
+                    string line = $"{now.Ticks}, {result.Name}, {result.Id}, {result.PrivateBytes}, {result.VirtualSize}, {result.WorkingSet}{Environment.NewLine}";
                     Console.Write(line);
                     File.AppendAllText("results.csv", line);
                 }
