@@ -33,7 +33,7 @@ namespace ProcessSizeWatcher
                 Console.Clear();
                 foreach (var result in results)
                 {
-                    string line = $"{now.Ticks}, {result.Name}, {result.Id}, {result.PrivateBytes}, {result.VirtualSize}, {result.WorkingSet}{Environment.NewLine}";
+                    string line = $"{now.Ticks}, {now.ToString("MM-dd-yyyy HH:mm:ss")}, {result.Name}, {result.Id}, {result.PrivateBytes}, {result.VirtualSize}, {result.WorkingSet}{Environment.NewLine}";
                     Console.Write(line);
                     File.AppendAllText("results.csv", line);
                 }
@@ -132,7 +132,8 @@ namespace ProcessSizeWatcher
 
         static void Main(string[] args)
         {
-            AnalyzeStats("C:/users/brush/desktop/results.csv");
+            GetStats();
+            //AnalyzeStats("C:/users/brush/desktop/results.csv");
         }
     }
 }
