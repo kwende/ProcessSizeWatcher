@@ -8,6 +8,7 @@ using System.Security.Permissions;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using MathNet.Numerics;
 
 namespace ProcessSizeWatcher
 {
@@ -42,6 +43,30 @@ namespace ProcessSizeWatcher
             }
         }
 
+        static void AnalyzeStats2(string resultsPath)
+        {
+            Stat[] allStats = Stat.ParseStatsFromFile(resultsPath);
+
+            // how many tickstamps exist? 
+            List<long> tickStamps = new List<long>();
+            for (int c = 0; c < allStats.Length; c++)
+            {
+                long tickStamp = allStats[c].TickStamp;
+                if (!tickStamps.Contains(tickStamp))
+                {
+                    tickStamps.Add(tickStamp);
+                }
+            }
+            int totalNumberOfTicks = tickStamps.Count;
+
+
+            List<int> activeListOfProcessIds = new List<int>();
+            for (int c = 1; c < tickStamps.Count; c++)
+            {
+                long currentTickStamp = tickStamps[c];
+            }
+        }
+
         static void AnalyzeStats(string resultsPath)
         {
             Stat[] allStats = Stat.ParseStatsFromFile(resultsPath);
@@ -73,58 +98,50 @@ namespace ProcessSizeWatcher
                 }
             }
 
-            //List<int> processIdsThatMightLeak = new List<int>();
-            //foreach (int processIdOfInterest in processIdsOfInterest)
-            //{
-            //    Stat[] statsForThisProcessId = allStats.Where(n => n.ProcessId == processIdOfInterest).ToArray();
-            //    long[] privateBytesOverTime = statsForThisProcessId.Select(n => n.PrivateBytes).ToArray();
-            //    long[] workingSetOverTime = statsForThisProcessId.Select(n => n.WorkingSet).ToArray();
-            //    long[] virtualBytesOverTime = statsForThisProcessId.Select(n => n.VirtualBytes).ToArray();
+            processIdsOfInterest.Add(allStats.Where(n => n.ProcessName == "Tracker").Select(n => n.ProcessId).First());
 
-            //    int endIndex = privateBytesOverTime.Length - 1;
+            const string MemoryDirectory = "C:/users/brush/desktop/memory/";
+            const double MinSlope = 10 * 1024;
 
-            //    // look every hour for an increase in any of these values, continue so long as so. 
-            //    if (privateBytesOverTime[totalNumberOfTicks - 1] - privateBytesOverTime[0] > 0 &&
-            //        workingSetOverTime[totalNumberOfTicks - 1] - workingSetOverTime[0] > 0 &&
-            //        virtualBytesOverTime[totalNumberOfTicks - 1] - virtualBytesOverTime[0] > 0)
-            //    {
-            //        processIdsThatMightLeak.Add(processIdOfInterest);
-            //    }
-            //}
+            if (Directory.Exists(MemoryDirectory))
+            {
+                Directory.Delete(MemoryDirectory, true);
+            }
+            Directory.CreateDirectory(MemoryDirectory);
 
-            //Console.WriteLine("These processes continued to increase...");
-
-            //foreach (int processId in processIdsThatMightLeak)
-            //{
-            //    string processName = allStats.Where(n => n.ProcessId == processId).First().ProcessName;
-            //    Console.WriteLine();
-            //    long[] workingSetValues = allStats.Where(n => n.ProcessId == processId).Select(n => n.WorkingSet).ToArray();
-            //    using (StreamWriter fout = new StreamWriter($"C:/users/brush/desktop/memory/{processName}.csv"))
-            //    {
-            //        foreach (long workingSetValue in workingSetValues)
-            //        {
-            //            fout.WriteLine($"{workingSetValue}");
-            //        }
-            //    }
-            //}
-
+            int numberFound = 0;
             foreach (int processId in processIdsOfInterest)
             {
                 string processName = allStats.Where(n => n.ProcessId == processId).First().ProcessName;
-                Console.WriteLine();
-                long[] workingSetValues = allStats.Where(n => n.ProcessId == processId).Select(n => n.WorkingSet).ToArray();
-                long[] privatByteValues = allStats.Where(n => n.ProcessId == processId).Select(n => n.PrivateBytes).ToArray();
-                long[] virtualByteValues = allStats.Where(n => n.ProcessId == processId).Select(n => n.VirtualBytes).ToArray();
-                using (StreamWriter fout = new StreamWriter($"C:/users/brush/desktop/memory/{processName}.csv"))
+                DateTime[] times = allStats.Where(n => n.ProcessId == processId).Select(n => n.Time).ToArray();
+                double[] workingSetValues = allStats.Where(n => n.ProcessId == processId).Select(n => (double)n.WorkingSet).ToArray();
+                double[] privatByteValues = allStats.Where(n => n.ProcessId == processId).Select(n => (double)n.PrivateBytes).ToArray();
+                double[] virtualByteValues = allStats.Where(n => n.ProcessId == processId).Select(n => (double)n.VirtualBytes).ToArray();
+                double[] x = new double[virtualByteValues.Length];
+                for (int c = 1; c <= x.Length; c++) x[c - 1] = c;
+
+                double workingSetSlope = Fit.Line(x, workingSetValues).Item2;
+                double privatBytesSlope = Fit.Line(x, privatByteValues).Item2;
+                double virtualByteSlope = Fit.Line(x, virtualByteValues).Item2;
+
+                Console.WriteLine($"{processName}: {virtualByteSlope / 1024} K/min");
+
+                if (workingSetSlope > MinSlope || privatBytesSlope > MinSlope || virtualByteSlope > MinSlope)
                 {
-                    fout.WriteLine("Working Set,PrivateBytes,VirtualBytes");
-                    for (int c = 0; c < workingSetValues.Length; c++)
+                    using (StreamWriter fout = new StreamWriter($"{MemoryDirectory}{processName}_{processId}.csv"))
                     {
-                        fout.WriteLine($"{workingSetValues[c]}, {privatByteValues[c]}, {virtualByteValues[c]}");
+                        fout.WriteLine("Time,Working Set,PrivateBytes,VirtualBytes");
+                        for (int c = 0; c < workingSetValues.Length; c++)
+                        {
+                            fout.WriteLine($"{times[c].ToString("MM-dd-yyyy HH:mm:ss")},{workingSetValues[c]}, {privatByteValues[c]}, {virtualByteValues[c]}");
+                        }
                     }
+
+                    numberFound++;
                 }
             }
 
+            Console.WriteLine($"Found {numberFound} matching processes.");
             Console.ReadLine();
 
             return;
@@ -132,8 +149,8 @@ namespace ProcessSizeWatcher
 
         static void Main(string[] args)
         {
-            GetStats();
-            //AnalyzeStats("C:/users/brush/desktop/results.csv");
+            //GetStats();
+            AnalyzeStats("C:/users/brush/desktop/results.csv");
         }
     }
 }

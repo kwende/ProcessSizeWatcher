@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -15,6 +16,7 @@ namespace ProcessSizeWatcher
         public long VirtualBytes { get; set; }
         public string ProcessName { get; set; }
         public long WorkingSet { get; set; }
+        public DateTime Time { get; set; }
 
         public static Stat[] ParseStatsFromFile(string fileName)
         {
@@ -28,11 +30,12 @@ namespace ProcessSizeWatcher
                 Stat stat = new Stat
                 {
                     TickStamp = long.Parse(bits[0]),
-                    ProcessName = bits[1],
-                    ProcessId = int.Parse(bits[2]),
-                    PrivateBytes = long.Parse(bits[3]),
-                    VirtualBytes = long.Parse(bits[4]),
-                    WorkingSet = long.Parse(bits[5]),
+                    Time = DateTime.ParseExact(bits[1], "MM-dd-yyyy HH:mm:ss", CultureInfo.InvariantCulture),
+                    ProcessName = bits[2],
+                    ProcessId = int.Parse(bits[3]),
+                    PrivateBytes = long.Parse(bits[4]),
+                    VirtualBytes = long.Parse(bits[5]),
+                    WorkingSet = long.Parse(bits[6]),
                 };
 
                 stats.Add(stat);
