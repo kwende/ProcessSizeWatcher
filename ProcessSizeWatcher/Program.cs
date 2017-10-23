@@ -54,7 +54,7 @@ namespace ProcessSizeWatcher
 
 
 
-                Thread.Sleep(1000 * 6);
+                Thread.Sleep(1000 * 60);
             }
         }
 
