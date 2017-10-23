@@ -16,7 +16,7 @@ namespace ProcessSizeWatcher
     {
         static void GetStats()
         {
-            for (;;)
+            for (; ; )
             {
                 Process[] allProcs = Process.GetProcesses();
 
@@ -28,18 +28,33 @@ namespace ProcessSizeWatcher
                         VirtualSize = n.VirtualMemorySize64,
                         Name = n.ProcessName,
                         WorkingSet = n.WorkingSet64,
+                        NonPagedMemory = n.NonpagedSystemMemorySize64,
+                        PagedMemory = n.PagedSystemMemorySize64
                     }).ToArray();
 
                 DateTime now = DateTime.Now;
                 Console.Clear();
+                Console.WriteLine("PerProcess: ");
                 foreach (var result in results)
                 {
-                    string line = $"{now.Ticks}, {now.ToString("MM-dd-yyyy HH:mm:ss")}, {result.Name}, {result.Id}, {result.PrivateBytes}, {result.VirtualSize}, {result.WorkingSet}{Environment.NewLine}";
-                    Console.Write(line);
-                    File.AppendAllText("results.csv", line);
+                    string line = $"{now.Ticks}, {now.ToString("MM-dd-yyyy HH:mm:ss")}, {result.Name}, {result.Id}, {result.PrivateBytes}, {result.VirtualSize}, {result.WorkingSet}, {result.PagedMemory}, {result.NonPagedMemory}{Environment.NewLine}";
+                    Console.Write("\t" + line);
+                    File.AppendAllText("perProcessResults.csv", line);
                 }
 
-                Thread.Sleep(1000 * 60);
+                Interop.MEMORYSTATUSEX memoryStatus = new Interop.MEMORYSTATUSEX();
+                if (Interop.GlobalMemoryStatusEx(memoryStatus))
+                {
+                    string globalLine =
+    $"{now.Ticks}, {now.ToString("MM-dd-yyyy HH:mm:ss")}, {memoryStatus.dwMemoryLoad}, {memoryStatus.ullAvailExtendedVirtual}, {memoryStatus.ullAvailPageFile}, {memoryStatus.ullAvailPhys}, {memoryStatus.ullAvailVirtual}, {memoryStatus.ullTotalPageFile}, {memoryStatus.ullTotalPhys}, {memoryStatus.ullTotalVirtual}";
+                    Console.WriteLine("SystemWide: ");
+                    Console.WriteLine("\t" + globalLine);
+                    File.AppendAllText("systemWideResults.csv", globalLine);
+                }
+
+
+
+                Thread.Sleep(1000 * 6);
             }
         }
 
@@ -149,8 +164,8 @@ namespace ProcessSizeWatcher
 
         static void Main(string[] args)
         {
-            //GetStats();
-            AnalyzeStats("C:/users/brush/desktop/results.csv");
+            GetStats();
+            //AnalyzeStats("C:/users/brush/desktop/results.csv");
         }
     }
 }
