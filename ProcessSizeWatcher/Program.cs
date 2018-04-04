@@ -14,7 +14,7 @@ namespace ProcessSizeWatcher
 {
     class Program
     {
-        static void GetStats()
+        static void GetStatsForAllProcesses()
         {
             for (; ; )
             {
@@ -46,7 +46,7 @@ namespace ProcessSizeWatcher
                 if (Interop.GlobalMemoryStatusEx(memoryStatus))
                 {
                     string globalLine =
-    $"{now.Ticks}, {now.ToString("MM-dd-yyyy HH:mm:ss")}, {memoryStatus.dwMemoryLoad}, {memoryStatus.ullAvailExtendedVirtual}, {memoryStatus.ullAvailPageFile}, {memoryStatus.ullAvailPhys}, {memoryStatus.ullAvailVirtual}, {memoryStatus.ullTotalPageFile}, {memoryStatus.ullTotalPhys}, {memoryStatus.ullTotalVirtual}";
+    $"{now.Ticks}, {now.ToString("MM-dd-yyyy HH:mm:ss")}, {memoryStatus.dwMemoryLoad}, {memoryStatus.ullAvailExtendedVirtual}, {memoryStatus.ullAvailPageFile}, {memoryStatus.ullAvailPhys}, {memoryStatus.ullAvailVirtual}, {memoryStatus.ullTotalPageFile}, {memoryStatus.ullTotalPhys}, {memoryStatus.ullTotalVirtual}{Environment.NewLine}";
                     Console.WriteLine("SystemWide: ");
                     Console.WriteLine("\t" + globalLine);
                     File.AppendAllText("systemWideResults.csv", globalLine);
@@ -56,6 +56,11 @@ namespace ProcessSizeWatcher
 
                 Thread.Sleep(1000 * 60);
             }
+        }
+
+        static void GetStatsForProcess(string processName)
+        {
+
         }
 
         static void AnalyzeStats2(string resultsPath)
@@ -82,7 +87,7 @@ namespace ProcessSizeWatcher
             }
         }
 
-        static void AnalyzeStats(string resultsPath)
+        static void AnalyzeStatsFile(string resultsPath)
         {
             Stat[] allStats = Stat.ParseStatsFromFile(resultsPath);
 
@@ -113,10 +118,10 @@ namespace ProcessSizeWatcher
                 }
             }
 
-            processIdsOfInterest.Add(allStats.Where(n => n.ProcessName == "Tracker").Select(n => n.ProcessId).First());
+            processIdsOfInterest.Add(allStats.Where(n => n.ProcessName == "Ocuvera.Video.PerformanceTestApp").Select(n => n.ProcessId).First());
 
             const string MemoryDirectory = "C:/users/brush/desktop/memory/";
-            const double MinSlope = 10 * 1024;
+            const double MinSlope = 0;// 10 * 1024;
 
             if (Directory.Exists(MemoryDirectory))
             {
@@ -139,7 +144,7 @@ namespace ProcessSizeWatcher
                 double privatBytesSlope = Fit.Line(x, privatByteValues).Item2;
                 double virtualByteSlope = Fit.Line(x, virtualByteValues).Item2;
 
-                Console.WriteLine($"{processName}: {virtualByteSlope / 1024} K/min");
+                Console.WriteLine($"{processName}: {virtualByteSlope / 1024} K/min.");
 
                 if (workingSetSlope > MinSlope || privatBytesSlope > MinSlope || virtualByteSlope > MinSlope)
                 {
@@ -162,10 +167,38 @@ namespace ProcessSizeWatcher
             return;
         }
 
+        static void LaunchAndGetStatsForOneProcess(string processFilePath)
+        {
+            Process proc = Process.Start(processFilePath); 
+
+            for (; ; )
+            {
+                proc.Refresh(); 
+                DateTime now = DateTime.Now;
+                Console.WriteLine("PerProcess: ");
+                string line = $"{now.Ticks}, {now.ToString("MM-dd-yyyy HH:mm:ss")}, {proc.ProcessName}, {proc.Id}, {proc.PrivateMemorySize64}, {proc.VirtualMemorySize64}, {proc.WorkingSet64}, {proc.PagedSystemMemorySize64}, {proc.NonpagedSystemMemorySize64}{Environment.NewLine}";
+
+                string fileName = Path.GetFileNameWithoutExtension(processFilePath); 
+                File.AppendAllText($"{fileName}_MemoryResults.csv", line);
+                Console.WriteLine(line); 
+                Thread.Sleep(1000 * 5);
+            }
+        }
+
         static void Main(string[] args)
         {
-            GetStats();
-            //AnalyzeStats("C:/users/brush/desktop/results.csv");
+            if (args.Length > 0 && args[0].EndsWith(".csv"))
+            {
+                AnalyzeStatsFile(args[0]);
+            }
+            else if(args.Length > 0 && args[0].EndsWith(".exe"))
+            {
+                LaunchAndGetStatsForOneProcess(args[0]); 
+            }
+            else
+            {
+                GetStatsForAllProcesses();
+            }
         }
     }
 }

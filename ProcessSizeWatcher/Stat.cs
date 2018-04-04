@@ -20,6 +20,7 @@ namespace ProcessSizeWatcher
 
         public static Stat[] ParseStatsFromFile(string fileName)
         {
+
             string[] lines = File.ReadAllLines(fileName);
 
             List<Stat> stats = new List<Stat>();
